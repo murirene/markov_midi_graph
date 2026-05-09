@@ -97,4 +97,100 @@ describe("Graph", () => {
     expect(graph.getNode(c)?.getEdges()).toEqual([]);
     expect(graph.getNode(g)?.getEdges()).toEqual([]);
   });
+
+  it("does nothing when removing an edge that does not exist", () => {
+    const graph = new Graph<string>();
+
+    const c = graph.addNode("C4");
+    const e = graph.addNode("E4");
+
+    // Should not throw
+    graph.removeEdge(c, e);
+
+    expect(graph.getNode(c)?.getEdges()).toEqual([]);
+  });
+
+  it("does nothing when removing an edge using missing node ids", () => {
+    const graph = new Graph<string>();
+
+    const c = graph.addNode("C4");
+
+    // Should not throw
+    graph.removeEdge(c, 999);
+    graph.removeEdge(999, c);
+
+    expect(graph.getNode(c)?.getEdges()).toEqual([]);
+  });
+
+  it("does nothing when removing a missing node id", () => {
+    const graph = new Graph<string>();
+
+    const c = graph.addNode("C4");
+
+    // Should not throw
+    graph.removeNode(999);
+
+    expect(graph.getNode(c)?.value).toBe("C4");
+  });
+
+  it("does not create duplicate edges when the same edge is inserted twice", () => {
+    const graph = new Graph<string>();
+
+    const c = graph.addNode("C4");
+    const e = graph.addNode("E4");
+
+    graph.insertEdge(c, e, 0.25);
+    graph.insertEdge(c, e, 0.9);
+
+    const edges = graph.getNode(c)?.getEdges();
+
+    expect(edges).toHaveLength(1);
+    expect(edges?.[0].from_node).toBe(c);
+    expect(edges?.[0].to_node).toBe(e);
+    // Current behavior: second insert is ignored (weight does not change)
+    expect(edges?.[0].weight).toBe(0.25);
+  });
+
+  it("does not remove unrelated edges when a node is removed", () => {
+    const graph = new Graph<string>();
+
+    const a = graph.addNode("A4");
+    const b = graph.addNode("B4");
+    const c = graph.addNode("C5");
+    const d = graph.addNode("D5");
+
+    graph.insertEdge(a, b, 0.1);
+    graph.insertEdge(c, d, 0.2);
+    graph.insertEdge(d, c, 0.3);
+
+    graph.removeNode(b);
+
+    // Edge A->B removed because B removed
+    expect(graph.getNode(a)?.getEdges()).toEqual([]);
+
+    // Other edges remain
+    const cEdges = graph.getNode(c)?.getEdges();
+    const dEdges = graph.getNode(d)?.getEdges();
+    expect(cEdges).toHaveLength(1);
+    expect(cEdges?.[0].to_node).toBe(d);
+    expect(dEdges).toHaveLength(1);
+    expect(dEdges?.[0].to_node).toBe(c);
+  });
+
+  it("keeps allocating new node ids even after removals", () => {
+    const graph = new Graph<string>();
+
+    const a = graph.addNode("A4");
+    const b = graph.addNode("B4");
+    const c = graph.addNode("C5");
+
+    graph.removeNode(b);
+
+    const d = graph.addNode("D5");
+
+    expect(a).toBe(0);
+    expect(b).toBe(1);
+    expect(c).toBe(2);
+    expect(d).toBe(3);
+  });
 });
