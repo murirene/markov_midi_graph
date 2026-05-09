@@ -2,9 +2,8 @@ import Edge from "./Edge"
 
 export default class Node<T> {
   private edges: Map<number, Edge>
-  private value: T
+  public readonly value: T
   public readonly id: number 
-  public getEdges = (): [Edge] => [...this.edges.values()]
 
   constructor( id: number, value: T) {
     this.id = id
@@ -20,6 +19,10 @@ export default class Node<T> {
     this.edges.set(neighbor, new Edge(this.id, neighbor, weight))
   }
 
+  hasNeighbor(neighbor: number): boolean {
+    return this.edges.has(neighbor)
+  }
+
   removeNeighbor(neighbor: number) {
     if (!this.edges.has(neighbor)) {
       return
@@ -32,7 +35,7 @@ export default class Node<T> {
     return `${this.id} ${this.value}`
   }
 
-  getEdges(): [Edge] {
-    return 
+  getEdges(): Edge[] {
+    return [...this.edges.values()]
   }
 }
