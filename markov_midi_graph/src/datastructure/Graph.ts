@@ -12,6 +12,10 @@ export class Graph<T> {
   private isValidNode = (id: number): boolean =>
     id >= 0 && id < this.node_counter && this.nodes.has(id)
 
+  getNodes(): Node<T>[] {
+    return this.nodes.values()
+  }
+
   getNode(id: number): Node<T> | undefined {
     return this.nodes.get(id)
   }
