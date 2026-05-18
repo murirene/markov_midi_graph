@@ -5,8 +5,8 @@ describe("Edge", () => {
   it("stores from node, to node, and weight", () => {
     const edge = new Edge(1, 2, 0.75);
 
-    expect(edge.from_node).toBe(1);
-    expect(edge.to_node).toBe(2);
+    expect(edge.fromNodeId).toBe(1);
+    expect(edge.toNodeId).toBe(2);
     expect(edge.weight).toBe(0.75);
   });
 
@@ -23,4 +23,11 @@ describe("Edge", () => {
 
     expect(edge.toString()).toBe("(1) --0.75--> (2)");
   });
+
+  it("returns a successful clone", () => {
+    const edge = new Edge(1, 3, 0.5)
+    const edgeCopy = edge.clone()
+
+    expect(edgeCopy).toEqual(edge) 
+  })
 });
