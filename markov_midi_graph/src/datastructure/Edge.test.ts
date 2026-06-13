@@ -24,10 +24,25 @@ describe("Edge", () => {
     expect(edge.toString()).toBe("(1) --0.75--> (2)");
   });
 
-  it("returns a successful clone", () => {
-    const edge = new Edge(1, 3, 0.5)
-    const edgeCopy = edge.clone()
+  it("defaults weight to 0 when not provided", () => {
+    const edge = new Edge(1, 2);
 
-    expect(edgeCopy).toEqual(edge) 
-  })
+    expect(edge.weight).toBe(0);
+  });
+
+  it("returns a successful clone", () => {
+    const edge = new Edge(1, 3, 0.5);
+    const edgeCopy = edge.clone();
+
+    expect(edgeCopy).toEqual(edge);
+  });
+
+  it("clone is independent from the original", () => {
+    const edge = new Edge(1, 3, 0.5);
+    const edgeCopy = edge.clone();
+
+    edgeCopy.weight = 0.99;
+
+    expect(edge.weight).toBe(0.5);
+  });
 });
