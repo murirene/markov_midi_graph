@@ -6,54 +6,68 @@ type Coordinate = {
 }
 
 export default class Node<T> {
-  private edges: Map<number, Edge>
+  private edgesByNeighborId: Map<number, Edge>
   public readonly value: T
-  public readonly id: number 
+  public readonly id: number
   public coordinate: Coordinate
 
-  constructor( id: number, value: T, c: Coordinate) {
+  constructor(id: number, value: T, c: Coordinate) {
     this.id = id
     this.value = value
-    this.coordinate = {...c}
-    this.edges = new Map<number, Edge>()
+    this.coordinate = { ...c }
+    this.edgesByNeighborId = new Map<number, Edge>()
   }
 
-  addNeighbor(neighbor: number, weight: number) {
-    if (this.edges.has(neighbor)) {
-      return
+  addNeighbor(neighborId: number, weight: number): this {
+    if (this.edgesByNeighborId.has(neighborId)) {
+      return this
     }
 
-    this.edges.set(neighbor, new Edge(this.id, neighbor, weight))
+    this.edgesByNeighborId.set(
+      neighborId,
+      new Edge(this.id, neighborId, weight),
+    )
+
+    return this
   }
 
   hasNeighbor(neighbor: number): boolean {
-    return this.edges.has(neighbor)
+    return this.edgesByNeighborId.has(neighbor)
   }
 
-  removeNeighbor(neighbor: number) {
-    if (!this.edges.has(neighbor)) {
-      return
+  removeNeighbor(neighbor: number): this {
+    if (!this.edgesByNeighborId.has(neighbor)) {
+      return this
     }
 
-    this.edges.delete(neighbor)
+    this.edgesByNeighborId.delete(neighbor)
+
+    return this
   }
 
-  toString():string {
+  updateCoordinate(x: number, y:number) {
+    this.coordinate = {x,y}
+    return this
+  }
+
+  toString(): string {
     return `${this.id} ${this.value} (${this.coordinate.x}, ${this.coordinate.y})`
   }
 
   clone(): Node<T> {
-    let {id, value, coordinate, edges} = ...this
-    
-    copyNode = new Node(id, value, coordinate)
-    this.edges.foreach((to_edge_id: number, edge:Edge) => copyNode.setEdge(to_edge_id, edge)) 
+    const copyNode = new Node<T>(this.id, this.value, this.coordinate)
+    this.edgesByNeighborId.forEach((edge) => copyNode.setEdge(edge.clone()))
+
+    return copyNode
+  }
+
+  private setEdge(e: Edge): this {
+    this.edgesByNeighborId.set(e.toNodeId, e)
+
+    return this
   }
 
   getEdges(): Edge[] {
-    return [...this.edges.values()]
-  }
-
-  setEdge(to_node: number, weight: number) {
-    this.edges.set(to_number, new Edge(this.id, to_number, weight))
+    return [...this.edgesByNeighborId.values()]
   }
 }

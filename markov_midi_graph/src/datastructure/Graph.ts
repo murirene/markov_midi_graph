@@ -9,25 +9,25 @@ export class Graph<T> {
     this.node_counter = 0
   }
 
-  private isValidNode = (id: number): boolean =>
-    id >= 0 && id < this.node_counter && this.nodes.has(id)
+  private isValidNode = (id: number): boolean => id >= 0 && this.nodes.has(id)
 
   getNodes(): Node<T>[] {
-    return this.nodes.values()
+    return [...this.nodes.values()]
   }
 
   getNode(id: number): Node<T> | undefined {
     return this.nodes.get(id)
   }
 
-  addNode(value: T): number {
+  addNode(value: T, coordinate = { x: 0, y: 0 }): this {
     const id = this.node_counter
-    this.nodes.set(id, new Node(id, value))
+    this.nodes.set(id, new Node(id, value, coordinate))
     this.node_counter++
-    return id
+
+    return this
   }
 
-  removeNode(id: number) {
+  removeNode(id: number): this {
     if (!this.isValidNode(id)) {
       return
     }
@@ -40,31 +40,37 @@ export class Graph<T> {
         node.removeNeighbor(id)
       }
     }
+
+    return this
   }
 
-  insertEdge(from_node: number, to_node: number, weight: number) {
+  insertEdge(from_node: number, to_node: number, weight: number): this {
     if (!(this.isValidNode(from_node) && this.isValidNode(to_node))) {
-      return
+      return this
     }
 
     const from = this.nodes.get(from_node)
     if (!from) {
-      return
+      return this
     }
 
     from.addNeighbor(to_node, weight)
+
+    return this
   }
 
-  removeEdge(from_node: number, to_node: number) {
+  removeEdge(from_node: number, to_node: number): this {
     if (!(this.isValidNode(from_node) && this.isValidNode(to_node))) {
-      return
+      return this
     }
 
     const from = this.nodes.get(from_node)
     if (!from || !from.hasNeighbor(to_node)) {
-      return
+      return this
     }
 
     from.removeNeighbor(to_node)
+
+    return this
   }
 }
