@@ -1,4 +1,5 @@
 import Node from "./Node"
+import { logError } from "./logger"
 
 export class Graph<T> {
   private nodes: Map<number, Node<T>>
@@ -29,12 +30,12 @@ export class Graph<T> {
 
   removeNode(id: number): this {
     if (!this.isValidNode(id)) {
-      return
+      logError(`Graph.removeNode: node ${id} does not exist`)
+      return this
     }
 
     this.nodes.delete(id)
 
-    // Remove all edges that point to this node
     for (const node of this.nodes.values()) {
       if (node.hasNeighbor(id)) {
         node.removeNeighbor(id)
@@ -45,12 +46,19 @@ export class Graph<T> {
   }
 
   insertEdge(from_node: number, to_node: number, weight: number): this {
-    if (!(this.isValidNode(from_node) && this.isValidNode(to_node))) {
+    if (!this.isValidNode(from_node)) {
+      logError(`Graph.insertEdge: from node ${from_node} does not exist`)
+      return this
+    }
+
+    if (!this.isValidNode(to_node)) {
+      logError(`Graph.insertEdge: to node ${to_node} does not exist`)
       return this
     }
 
     const from = this.nodes.get(from_node)
     if (!from) {
+      logError(`Graph.insertEdge: could not retrieve node ${from_node}`)
       return this
     }
 
@@ -60,12 +68,24 @@ export class Graph<T> {
   }
 
   removeEdge(from_node: number, to_node: number): this {
-    if (!(this.isValidNode(from_node) && this.isValidNode(to_node))) {
+    if (!this.isValidNode(from_node)) {
+      logError(`Graph.removeEdge: from node ${from_node} does not exist`)
+      return this
+    }
+
+    if (!this.isValidNode(to_node)) {
+      logError(`Graph.removeEdge: to node ${to_node} does not exist`)
       return this
     }
 
     const from = this.nodes.get(from_node)
-    if (!from || !from.hasNeighbor(to_node)) {
+    if (!from) {
+      logError(`Graph.removeEdge: could not retrieve node ${from_node}`)
+      return this
+    }
+
+    if (!from.hasNeighbor(to_node)) {
+      logError(`Graph.removeEdge: edge ${from_node} -> ${to_node} does not exist`)
       return this
     }
 

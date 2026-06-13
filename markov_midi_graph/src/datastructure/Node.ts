@@ -1,4 +1,5 @@
 import Edge from "./Edge"
+import { logError } from "./logger"
 
 type Coordinate = {
   x: number
@@ -20,6 +21,7 @@ export default class Node<T> {
 
   addNeighbor(neighborId: number, weight: number): this {
     if (this.edgesByNeighborId.has(neighborId)) {
+      logError(`Node ${this.id}: neighbor ${neighborId} already exists, skipping duplicate edge`)
       return this
     }
 
@@ -37,6 +39,7 @@ export default class Node<T> {
 
   removeNeighbor(neighbor: number): this {
     if (!this.edgesByNeighborId.has(neighbor)) {
+      logError(`Node ${this.id}: neighbor ${neighbor} does not exist, nothing to remove`)
       return this
     }
 
@@ -45,8 +48,8 @@ export default class Node<T> {
     return this
   }
 
-  updateCoordinate(x: number, y:number) {
-    this.coordinate = {x,y}
+  updateCoordinate(x: number, y: number): this {
+    this.coordinate = { x, y }
     return this
   }
 
