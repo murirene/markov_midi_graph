@@ -70,7 +70,9 @@ export default class Graph<T> {
 
   insertEdge(fromNodeId: number, toNodeId: number, weight: number): this {
     const fromNode = this.nodes.get(fromNodeId)
-    if (fromNode == undefined) return this
+    const toNode = this.nodes.get(toNodeId)
+
+    if (fromNode == undefined || toNode == undefined) return this
 
     fromNode.addNeighbor(toNodeId, weight)
 
