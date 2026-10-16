@@ -1,12 +1,11 @@
-import {useEffect, useState} from "react"
-import {timer} from "d3"
+import { useState } from "react"
+// import { timer } from "d3"
 import Graph from "./datastructure/Graph"
 
-type MusicCompositionProps = { fill:string }
+type MusicCompositionProps = { fill: string }
 // type MusicPoint = { x: number, y: number }
 
-
-const MusicComposition = ({fill}: MusicCompositionProps) => {
+const MusicComposition = ({ fill }: MusicCompositionProps) => {
   const [midiGraph, setMidiGraph] = useState<Graph>(new Graph())
 
   /*  const [pos, setPos] = useState<MusicPoint>({x: 400, y: 300})
@@ -27,6 +26,5 @@ const MusicComposition = ({fill}: MusicCompositionProps) => {
 
   return <div>{midiGraph.length} nodes in the Graph</div>
 }
-
 
 export default MusicComposition
