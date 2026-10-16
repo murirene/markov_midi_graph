@@ -16,7 +16,7 @@ export function MusicView() {
       setViewWidth(window.innerWidth)
       setViewHeight(window.innerHeight)
     }
-/*    const colorTimerId = setInterval(
+    /*    const colorTimerId = setInterval(
       () => setViewColor((h) => (h + 1) % 360),
       40,
     )
@@ -26,10 +26,10 @@ export function MusicView() {
 
     return () => {
       window.removeEventListener("resize", handleViewResize)
-//      clearInterval(colorTimerId)
+      //      clearInterval(colorTimerId)
     }
   }, [])
-  
+
   return (
     <svg
       ref={svgRef}

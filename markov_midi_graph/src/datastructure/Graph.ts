@@ -1,96 +1,93 @@
 import Node from "./Node"
-import { logError } from "./logger"
 
-export class Graph<T> {
+export default class Graph<T> {
   private nodes: Map<number, Node<T>>
-  private node_counter: number
+  private nodeIdSeq: number
 
   constructor() {
     this.nodes = new Map<number, Node<T>>()
-    this.node_counter = 0
+    this.nodeIdSeq = 0
   }
 
-  private isValidNode = (id: number): boolean => id >= 0 && this.nodes.has(id)
+  clone(): Graph<T> {
+    const graphCopy = new Graph<T>()
+    for ( const [nodeId, node] of this.nodes) {
+      graphCopy.nodes.set(nodeId, node.clone())
+    }
+
+    graphCopy.nodeIdSeq = this.nodeIdSeq
+
+    return graphCopy
+  }
+
+  isEmpty(): boolean {
+    return this.nodes.size === 0
+  }
+
+  getNode(nodeId: number): Node<T> | undefined {
+    return this.nodes.get(nodeId)
+  }
 
   getNodes(): Node<T>[] {
     return [...this.nodes.values()]
   }
 
-  getNode(id: number): Node<T> | undefined {
-    return this.nodes.get(id)
+  // returns the nodes its connected too
+  getNeighbors(nodeId: number): Node<T>[] {
+    return (
+      this.nodes
+        .get(nodeId)
+        ?.getEdges()
+        .map((edge) => this.nodes.get(edge.toNodeId))
+        .filter((v) => v != undefined) ?? []
+    )
   }
 
   addNode(value: T, coordinate = { x: 0, y: 0 }): this {
-    const id = this.node_counter
-    this.nodes.set(id, new Node(id, value, coordinate))
-    this.node_counter++
+    const nodeId = this.nodeIdSeq++
+    this.nodes.set(nodeId, new Node(nodeId, value, coordinate))
 
     return this
   }
 
-  removeNode(id: number): this {
-    if (!this.isValidNode(id)) {
-      logError(`Graph.removeNode: node ${id} does not exist`)
+  removeNode(nodeId: number): this {
+    if (!this.nodes.has(nodeId)) {
       return this
     }
 
-    this.nodes.delete(id)
+    // remove the node itself
+    this.nodes.delete(nodeId)
 
+    // remove any edges too the node being removed
     for (const node of this.nodes.values()) {
-      if (node.hasNeighbor(id)) {
-        node.removeNeighbor(id)
+      if (node.hasNeighbor(nodeId)) {
+        node.removeNeighbor(nodeId)
       }
     }
 
     return this
   }
 
-  insertEdge(from_node: number, to_node: number, weight: number): this {
-    if (!this.isValidNode(from_node)) {
-      logError(`Graph.insertEdge: from node ${from_node} does not exist`)
-      return this
-    }
+  insertEdge(fromNodeId: number, toNodeId: number, weight: number): this {
+    const fromNode = this.nodes.get(fromNodeId)
+    if (fromNode == undefined) return this
 
-    if (!this.isValidNode(to_node)) {
-      logError(`Graph.insertEdge: to node ${to_node} does not exist`)
-      return this
-    }
-
-    const from = this.nodes.get(from_node)
-    if (!from) {
-      logError(`Graph.insertEdge: could not retrieve node ${from_node}`)
-      return this
-    }
-
-    from.addNeighbor(to_node, weight)
+    fromNode.addNeighbor(toNodeId, weight)
 
     return this
   }
 
-  removeEdge(from_node: number, to_node: number): this {
-    if (!this.isValidNode(from_node)) {
-      logError(`Graph.removeEdge: from node ${from_node} does not exist`)
+  removeEdge(fromNodeId: number, toNodeId: number): this {
+    if (!this.nodes.has(fromNodeId) || !this.nodes.has(toNodeId)) {
       return this
     }
 
-    if (!this.isValidNode(to_node)) {
-      logError(`Graph.removeEdge: to node ${to_node} does not exist`)
-      return this
-    }
-
-    const from = this.nodes.get(from_node)
-    if (!from) {
-      logError(`Graph.removeEdge: could not retrieve node ${from_node}`)
-      return this
-    }
-
-    if (!from.hasNeighbor(to_node)) {
-      logError(`Graph.removeEdge: edge ${from_node} -> ${to_node} does not exist`)
-      return this
-    }
-
-    from.removeNeighbor(to_node)
+    this.nodes.get(fromNodeId)?.removeNeighbor(toNodeId)
 
     return this
+  }
+
+  hasEdge(fromNodeId: number, toNodeId: number): boolean {
+    return this.nodes.get(fromNodeId)?.hasNeighbor(toNodeId) ?? false
   }
 }

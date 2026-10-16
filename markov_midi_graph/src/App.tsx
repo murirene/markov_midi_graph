@@ -1,7 +1,7 @@
 import { MusicView } from "./MusicView"
 
 function App() {
-  return <MusicView /> 
+  return <MusicView />
 }
 
 export default App
