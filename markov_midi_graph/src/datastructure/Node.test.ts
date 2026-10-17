@@ -4,10 +4,10 @@ import Node from "./Node"
 const defaultCoordinate = { x: 100, y: 200 }
 
 describe("Node", () => {
-  it("stores an id, value, and coordinate", () => {
+  it("stores an nodeId, value, and coordinate", () => {
     const node = new Node(0, "C4", defaultCoordinate)
 
-    expect(node.id).toBe(0)
+    expect(node.nodeId).toBe(0)
     expect(node.value).toBe("C4")
     expect(node.coordinate).toEqual(defaultCoordinate)
   })
@@ -104,7 +104,7 @@ describe("Node", () => {
 
     const copy = node.clone()
 
-    expect(copy.id).toBe(node.id)
+    expect(copy.nodeId).toBe(node.nodeId)
     expect(copy.value).toBe(node.value)
     expect(copy.coordinate).toEqual(node.coordinate)
     expect(copy.getEdges()).toHaveLength(1)

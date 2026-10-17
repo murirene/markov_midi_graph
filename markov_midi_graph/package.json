@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "check": "tsc -b && eslint . && prettier --check src && vitest run"
   },
   "dependencies": {
     "react": "^19.2.4",
