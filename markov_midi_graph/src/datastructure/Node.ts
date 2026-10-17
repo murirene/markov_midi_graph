@@ -1,5 +1,4 @@
 import Edge from "./Edge"
-import { logError } from "./logger"
 
 type Coordinate = {
   x: number
@@ -7,47 +6,41 @@ type Coordinate = {
 }
 
 export default class Node<T> {
-  private edgesByNeighborId: Map<number, Edge>
   public readonly value: T
-  public readonly id: number
+  public readonly nodeId: number
   public coordinate: Coordinate
+  private edgesByNeighborId: Map<number, Edge>
 
-  constructor(id: number, value: T, c: Coordinate) {
-    this.id = id
+  constructor(nodeId: number, value: T, c: Coordinate) {
+    this.nodeId = nodeId
     this.value = value
     this.coordinate = { ...c }
     this.edgesByNeighborId = new Map<number, Edge>()
   }
 
+  hasNeighbor(neighborId: number): boolean {
+    return this.edgesByNeighborId.has(neighborId)
+  }
+
   addNeighbor(neighborId: number, weight: number): this {
-    if (this.edgesByNeighborId.has(neighborId)) {
-      logError(
-        `Node ${this.id}: neighbor ${neighborId} already exists, skipping duplicate edge`,
-      )
+    if (this.hasNeighbor(neighborId)) {
       return this
     }
 
     this.edgesByNeighborId.set(
       neighborId,
-      new Edge(this.id, neighborId, weight),
+      new Edge(this.nodeId, neighborId, weight),
     )
 
     return this
   }
 
-  hasNeighbor(neighbor: number): boolean {
-    return this.edgesByNeighborId.has(neighbor)
-  }
-
-  removeNeighbor(neighbor: number): this {
-    if (!this.edgesByNeighborId.has(neighbor)) {
-      logError(
-        `Node ${this.id}: neighbor ${neighbor} does not exist, nothing to remove`,
-      )
+  removeNeighbor(neighborId: number): this {
+    if (!this.hasNeighbor(neighborId)) {
       return this
     }
 
-    this.edgesByNeighborId.delete(neighbor)
+    this.edgesByNeighborId.delete(neighborId)
 
     return this
   }
@@ -58,20 +51,16 @@ export default class Node<T> {
   }
 
   toString(): string {
-    return `${this.id} ${this.value} (${this.coordinate.x}, ${this.coordinate.y})`
+    return `${this.nodeId} ${this.value} (${this.coordinate.x}, ${this.coordinate.y})`
   }
 
   clone(): Node<T> {
-    const copyNode = new Node<T>(this.id, this.value, this.coordinate)
-    this.edgesByNeighborId.forEach((edge) => copyNode.setEdge(edge.clone()))
+    const copyNode = new Node<T>(this.nodeId, this.value, this.coordinate)
+    this.edgesByNeighborId.forEach((edge) =>
+      copyNode.edgesByNeighborId.set(edge.toNodeId, edge.clone()),
+    )
 
     return copyNode
-  }
-
-  private setEdge(e: Edge): this {
-    this.edgesByNeighborId.set(e.toNodeId, e)
-
-    return this
   }
 
   getEdges(): Edge[] {

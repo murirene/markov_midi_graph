@@ -11,7 +11,7 @@ export default class Graph<T> {
 
   clone(): Graph<T> {
     const graphCopy = new Graph<T>()
-    for ( const [nodeId, node] of this.nodes) {
+    for (const [nodeId, node] of this.nodes) {
       graphCopy.nodes.set(nodeId, node.clone())
     }
 
