@@ -1,6 +1,6 @@
 import Edge from "./Edge"
 
-type Coordinate = {
+export type Coordinate = {
   x: number
   y: number
 }
