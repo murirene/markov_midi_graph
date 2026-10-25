@@ -42,12 +42,33 @@ export function MusicView() {
     }
   }, [])
 
+  useEffect(() => {
+    if (simulationRef.current == null) return
+
+    simulationRef.current.alpha(1).restart()
+  }, [viewWidth, viewHeight])
+
   // Create the collision simulation when this component mounts
   useEffect(() => {
     simulationRef.current = forceSimulation<DisplayNode>([])
       .force("collide", forceCollide(55))
       .on("tick", () => {
+        const svg = svgRef.current
+        if (svg == null) return
+
         const nodes = simulationRef.current?.nodes() ?? []
+        const xMin = 50
+        const yMin = 50
+        const xMax = svg.width.baseVal.value - 50
+        const yMax = svg.height.baseVal.value - 50
+
+        for (let n of nodes) {
+          if (n.x < xMin) n.x = xMin
+          if (n.x > xMax) n.x = xMax
+          if (n.y < yMin) n.y = yMin
+          if (n.y > yMax) n.y = yMax
+        }
+
         setDisplayNodes(
           new Map<number, Coordinate>(
             nodes.map(({ nodeId, x, y }) => [nodeId, { x, y }]),
