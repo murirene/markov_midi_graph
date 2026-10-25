@@ -1,12 +1,17 @@
 import { useEffect, useReducer, useRef, useState } from "react"
+import { forceSimulation, forceCollide } from "d3-force"
 import graphReducer from "./graphReducer"
 import Graph from "./datastructure/Graph"
 import Note from "./Note.tsx"
+import {type Coordinate} from "./datastructure/Node"
 
 export function MusicView() {
   const [viewWidth, setViewWidth] = useState<number>(window.innerWidth)
   const [viewHeight, setViewHeight] = useState<number>(window.innerHeight)
   const [selectedNodeId, setSelectedNodeId] = useState<number>(-1)
+  const [displayNodes, setDisplayNodes] = useState<Map<number, Coordinate>>(
+    new Map(),
+  )
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [viewColor] = useState<number>(0)
 
@@ -28,6 +33,25 @@ export function MusicView() {
       window.removeEventListener("resize", handleViewResize)
     }
   }, [])
+
+  // when the graph updateas, apply the collision force
+  useEffect(() => {
+    const nodes = state.midiGraph
+      .getNodes()
+      .map(({ nodeId, coordinate }) => ({ nodeId, ...coordinate }))
+    const simulation = forceSimulation(nodes)
+      .force("collide", forceCollide(55))
+      .on("tick", () => {
+        const nodesMap = new Map<number, Coordinate>(
+          nodes.map(({ nodeId, x, y }) => [nodeId, { x, y }]),
+        )
+        setDisplayNodes(nodesMap)
+      })
+
+      return () => {
+        simulation.stop()
+      }
+  }, [state.midiGraph])
 
   return (
     <svg
@@ -52,14 +76,10 @@ export function MusicView() {
       />
       {state.midiGraph.getNodes().map((n) => (
         <Note
-          key={`note_${n.nodeId}`}
-          coordinate={{ ...n.coordinate }}
+          key={n.nodeId}
+          coordinate={{ ...(displayNodes.get(n.nodeId) ?? { x: 0, y: 0 }) }}
           onSelected={() => setSelectedNodeId(n.nodeId)}
-          color={
-            selectedNodeId === n.nodeId
-              ? "hsl(51, 100%, 50%)"
-              : "hsl(200, 50%, 100%)"
-          }
+          isSelected={selectedNodeId === n.nodeId}
         />
       ))}
     </svg>

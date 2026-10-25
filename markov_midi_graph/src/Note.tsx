@@ -2,8 +2,8 @@ import { type Coordinate } from "./datastructure/Node"
 
 type NoteProp = {
   coordinate: Coordinate
+  isSelected: boolean
   onSelected: () => void
-  color: string
 }
 
 export default function Note(props: NoteProp) {
@@ -12,7 +12,7 @@ export default function Note(props: NoteProp) {
       cx={props.coordinate.x}
       cy={props.coordinate.y}
       r="50"
-      fill={props.color}
+      fill={props.isSelected ? "hsl(51, 100%, 50%)" : "hsl(200, 50%, 100%)"}
       onClick={() => props.onSelected()}
     />
   )
