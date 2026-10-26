@@ -1,11 +1,11 @@
 import Graph from "./datastructure/Graph"
 import { type Coordinate } from "./datastructure/Node"
 
-type MidiState = {
+export type MidiState = {
   midiGraph: Graph<string>
 }
 
-type MidiAction = { type: "add node"; coordinate: Coordinate }
+export type MidiAction = { type: "add node"; coordinate: Coordinate }
 
 export default function graphReducer(
   state: MidiState,
