@@ -1,0 +1,3 @@
+# Real credentials live here. Only .env.example is committed.
+.env
+node_modules

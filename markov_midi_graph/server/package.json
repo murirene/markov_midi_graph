@@ -1,0 +1,35 @@
+{
+  "name": "markov_midi_graph-server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/index.ts",
+    "start": "node --env-file-if-exists=.env src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "api:status": "./scripts/api.sh status",
+    "api:stop": "./scripts/api.sh stop",
+    "db:start": "./scripts/db.sh start",
+    "db:stop": "./scripts/db.sh stop",
+    "db:status": "./scripts/db.sh status",
+    "db:psql": "./scripts/db.sh psql",
+    "db:psql-app": "./scripts/db.sh psql-app",
+    "status": "./scripts/db.sh status; ./scripts/api.sh status"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/express5": "^1.1.2",
+    "express": "^5.3.0",
+    "graphql": "^16.14.2",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "typescript": "~6.0"
+  }
+}
