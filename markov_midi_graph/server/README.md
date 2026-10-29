@@ -198,23 +198,135 @@ Verified responses (2026-10-28):
 
 | Item | Value |
 |------|-------|
-| Database | `markov_midi_graph_dev` (UTF8), owned by `markov_app` |
-| App role | `markov_app`: LOGIN, **not** superuser, cannot create databases or roles. As owner of the DB it *can* create tables in the `public` schema (for your future graph tables) |
-| Admin/superuser role | `renemurillo` (same name as your macOS user, created by Homebrew) |
-| Other databases | `postgres`, `template0`, `template1` (built-in; leave them alone) |
+| Database | `markov_midi_graph_dev` (UTF8), owned by `markov_app`, no tables yet |
+| Other databases | `postgres`, `template0`, `template1` (built-in, owned by `renemurillo`; leave them alone) |
+
+## Accounts and authentication
+
+There are **two separate kinds of account**, and they share one name, which
+is easy to confuse:
+
+- **Mac accounts** are macOS users. They own files and run processes.
+- **PostgreSQL roles** live *inside* the database cluster (stored in its
+  `pg_authid` catalog). They own databases/tables and log in to PostgreSQL.
+
+A PostgreSQL role is not a Mac account. `renemurillo` exists twice: once as
+your Mac login and once as a PostgreSQL role that Homebrew's `initdb` named
+after you.
+
+Verified 2026-10-28 by inspecting the running server, the catalogs, and the
+files.
+
+### Mac accounts
+
+| Mac account | Role in this setup |
+|-------------|--------------------|
+| `renemurillo` (uid 501, in the `admin` group) | **Owns all database files**: `/opt/homebrew/var/postgresql@18` is `drwx------ renemurillo:admin`; every file inside is owned by it, and `postgresql.conf`/`pg_hba.conf` are mode `600`. **Runs the server**: the `postgres` main process and all its child processes run as `renemurillo`, because you start them yourself with `npm run db:start`. Also owns `server/.env` (mode `600`). |
+| `_postgres` | A built-in macOS system account that ships with macOS. **Not used** by this setup. Ignore it. |
+| `root` | **Disabled** (no password or authentication set) and **not needed**. Never use `sudo` for any database command here. PostgreSQL refuses to run as root anyway. |
+
+There is no dedicated service account and no background service. The server
+exists only while you've started it.
+
+### PostgreSQL roles
+
+| Attribute | `renemurillo` (administrator) | `markov_app` (application) |
+|-----------|-------------------------------|----------------------------|
+| Created by | Homebrew's `initdb` at install | This setup, `CREATE ROLE … LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION` |
+| Superuser | **yes** | **no** |
+| Create roles / databases | yes / yes | **no / no** |
+| Replication / bypass row-level security | yes / yes | **no / no** |
+| Can log in | yes | yes |
+| Member of other roles | n/a | **none** (inherits no extra privileges) |
+| Connection limit / expiry | none / none | none / none |
+| Stored password | **none** (no password exists) | SCRAM-SHA-256 hash in `pg_authid` (never plaintext) |
+| How it authenticates | `peer` over the Unix socket only | `scram-sha-256` password over TCP localhost only |
+| Owns | `postgres`, `template0`, `template1` | `markov_midi_graph_dev` |
+
+### What `markov_app` can and cannot do (each tested)
+
+| Can | Cannot (error received) |
+|-----|-------------------------|
+| Connect to `markov_midi_graph_dev` and create/alter/drop tables, schemas, and data there (it's the database owner, and in PG 15+ the `public` schema belongs to the database owner) | Create a database: `permission denied to create database` |
+| Create session-only temporary tables | Create a role: `Only roles with the CREATEROLE attribute may create roles` |
+| Connect to `postgres`/`template1` (PostgreSQL's default `PUBLIC` CONNECT), but only to look around | Create anything in the `postgres` database: `permission denied for schema public` |
+| | Read password hashes: `permission denied for table pg_authid` |
+| | Read server files: `permission denied for function pg_read_file` |
+| | Change server settings: `permission denied to set parameter` (`ALTER SYSTEM`) |
+| | Become the superuser: `permission denied to set role "renemurillo"` |
+
+Conclusion: `markov_app` is correctly restricted. It's a normal login role
+with full control of **its own** database and nothing else.
 
 ### Who can log in, and how (`/opt/homebrew/var/postgresql@18/pg_hba.conf`)
 
+PostgreSQL reads this file top to bottom and uses the first matching line.
+
 | Connection | Method | Meaning |
 |------------|--------|---------|
-| Unix socket (`local`) | `peer` | Postgres checks your macOS username. `renemurillo` can connect as `renemurillo` with no password; nobody can impersonate another role this way |
-| TCP 127.0.0.1 / ::1 (`host`) | `scram-sha-256` | Password required. This is how the backend connects as `markov_app` |
-| Anything else | rejected | There are no rules for other addresses, and the server only listens on localhost anyway |
+| Unix socket (`local`), socket file in `/tmp` | `peer` | PostgreSQL asks macOS which Mac account is on the other end and only allows the PostgreSQL role **with the same name**. Your Mac account `renemurillo` gets the role `renemurillo`, with no password. Any other Mac user, or an attempt like `psql -U markov_app` over the socket, is rejected (`Peer authentication failed`) |
+| TCP 127.0.0.1 / ::1 (`host`) | `scram-sha-256` | Password required. This is how the backend and `npm run db:psql-app` connect as `markov_app`. The superuser can't use this path because it has no password (`fe_sendauth: no password supplied`) |
+| Anything else | rejected | There are no rules for other addresses, and the server only listens on localhost (`listen_addresses = localhost`) anyway |
+
+Other verified server settings: `password_encryption = scram-sha-256`,
+`unix_socket_directories = /tmp`, `ssl = off` (fine: traffic never leaves this
+Mac). The socket file is world-accessible (`0777`, the default), but `peer`
+still restricts each Mac user to a same-named role, and only `renemurillo` has one.
 
 Homebrew's original file (which trusted **every** local connection without a
 password) is saved as `/opt/homebrew/var/postgresql@18/pg_hba.conf.homebrew-default`.
 The `listen_addresses`/`port` lines are appended at the bottom of
 `/opt/homebrew/var/postgresql@18/postgresql.conf`.
+
+### Connecting as the administrator
+
+You must be logged in to the Mac as `renemurillo`, and the server must be running.
+
+```bash
+# from server/ (wrapper script)
+npm run db:psql
+
+# the same thing from any directory, spelled out
+/opt/homebrew/opt/postgresql@18/bin/psql -d markov_midi_graph_dev
+```
+
+There's no `-U` and no `-h`: psql defaults to the role named after your Mac
+account and to the Unix socket in `/tmp`, so `peer` authentication applies and
+**no password is asked or needed**. Confirm inside psql with `\conninfo`; it
+should show `Client User | renemurillo`, `Socket Directory | /tmp`,
+`Password Used | false`, `Superuser | on`. Use `-d postgres` instead to work
+outside the app database.
+
+Use the administrator only for administration (roles, passwords, extensions,
+inspecting the server). Do day-to-day app work as `markov_app`.
+
+### Where the application credentials live
+
+| Item | Location |
+|------|----------|
+| Connection settings + password the backend uses | `server/.env` (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`). Mode `600`, owned by Mac account `renemurillo`, git-ignored (`server/.gitignore`), never committed |
+| Template without secrets | `server/.env.example` (committed) |
+| Server-side copy | Only a SCRAM-SHA-256 **hash** in `pg_authid`, readable only by a superuser. The plaintext password can't be recovered from it; `server/.env` is the only plaintext copy |
+
+Locate credentials safely, without printing the password: see
+[Recover connection details](#recover-connection-details-without-printing-the-password)
+below. In short: `grep -v '^PGPASSWORD' .env` from `server/`. If the password
+is lost, reset it with `\password markov_app` as the administrator.
+
+### When you finish inspecting
+
+```bash
+npm run db:stop      # from server/: clean "fast" shutdown of this cluster only
+npm run db:status    # expect: pg_ctl: no server running
+```
+
+### Optional hardening (not applied)
+
+By PostgreSQL default, every role, `markov_app` included, may *connect* to
+`postgres` and `template1`, though it can't create anything there. To block
+even that, run this as the administrator:
+`REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;`. It's not needed for local
+development.
 
 ### Connect and inspect
 
