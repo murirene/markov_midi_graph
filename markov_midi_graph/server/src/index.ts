@@ -7,6 +7,7 @@ import { config } from "./config.ts"
 import { pool } from "./db/pool.ts"
 import { resolvers } from "./graphql/resolvers.ts"
 import { typeDefs } from "./graphql/schema.ts"
+import { removePidFile, writePidFile } from "./pidFile.ts"
 import { healthRouter } from "./routes/health.ts"
 
 // One Express app serves both REST (/api/...) and GraphQL (/graphql).
@@ -28,6 +29,7 @@ app.use("/api", healthRouter)
 app.use("/graphql", expressMiddleware(apollo))
 
 httpServer.listen(config.port, config.host, () => {
+  writePidFile()
   console.log(`REST     http://${config.host}:${config.port}/api/health`)
   console.log(`GraphQL  http://${config.host}:${config.port}/graphql`)
 })
@@ -37,6 +39,7 @@ async function shutdown(signal: string) {
   console.log(`${signal} received, shutting down`)
   await apollo.stop() // also closes httpServer via the drain plugin
   await pool.end() // closes database connections
+  removePidFile()
   process.exit(0)
 }
 process.once("SIGINT", () => void shutdown("SIGINT"))

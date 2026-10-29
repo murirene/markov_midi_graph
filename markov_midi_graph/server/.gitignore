@@ -1,3 +1,5 @@
 # Real credentials live here. Only .env.example is committed.
 .env
+# Runtime record of the running API's process IDs (see scripts/api.sh).
+.api.pid
 node_modules

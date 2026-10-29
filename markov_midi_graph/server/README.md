@@ -13,19 +13,27 @@ Set up and verified on 2026-10-28 on macOS (Apple Silicon, Homebrew in
 
 ---
 
-## Quick start (copy, paste, in this order)
+## Which instructions do I need?
+
+| Situation | Go to |
+|-----------|-------|
+| This Mac already has the setup (`/opt/homebrew/var/postgresql@18` exists and `server/.env` exists) and you just want to work | [Everyday start (existing setup)](#everyday-start-existing-setup) |
+| New Mac, fresh clone, or PostgreSQL / `server/.env` missing | [Fresh-machine setup (one time)](#fresh-machine-setup-one-time), then the everyday start |
+
+Not sure? From `server/`, run
+`ls /opt/homebrew/var/postgresql@18/PG_VERSION .env`. If both files are
+listed, it's an existing setup.
+
+## Everyday start (existing setup)
 
 | # | Directory | Command | What it does |
 |---|-----------|---------|--------------|
 | 1 | `server/` | `nvm use` | Switch to Node 24 (reads `server/.nvmrc`) |
-| 2 | `server/` | `npm install` | Only needed after a fresh clone or a dependency change |
+| 2 | `server/` | `npm install` | Only after pulling a dependency change; otherwise skip |
 | 3 | `server/` | `npm run db:start` | Start PostgreSQL |
 | 4 | `server/` | `npm run dev` | Start the API (keeps this terminal busy; auto-restarts on file save) |
 | 5 | `server/` (2nd terminal) | `npm run status` | Confirm DB and API are both up |
 | 6 | project root (3rd terminal, optional) | `npm run dev` | Start the React app (Vite, http://localhost:5173) |
-
-First time on a new machine/clone? You also need `server/.env`, see
-[Configuration](#configuration-and-credentials).
 
 ### Shut down when you finish (reverse order)
 
@@ -34,7 +42,233 @@ First time on a new machine/clone? You also need `server/.env`, see
 | 1 | React terminal | `Ctrl-C` |
 | 2 | API terminal | `Ctrl-C` (or from anywhere in `server/`: `npm run api:stop`) |
 | 3 | `server/` | `npm run db:stop` |
-| 4 | `server/` | `npm run status`: expect `no server running` and `api: nothing listening` |
+| 4 | `server/` | `npm run status`: expect `pg_ctl: no server running` and `api: stopped (nothing listening on port 4000)` |
+
+---
+
+## Fresh-machine setup (one time)
+
+This recreates the setup described in this file on a Mac that doesn't have
+it. Every step **checks first** and refuses to overwrite an existing cluster,
+role, database, or `.env`, so it's safe to re-run step by step if something
+fails halfway. Nothing here registers anything to start at login.
+
+Assumptions: Apple Silicon Mac with Homebrew in `/opt/homebrew` (on an Intel
+Mac, Homebrew uses `/usr/local`, and the paths in `server/scripts/db.sh`
+would need editing). You're logged in as the Mac account that should own and
+run the database. **Don't use `sudo`** for any step.
+
+### 1. Homebrew
+
+```bash
+brew --version          # if "command not found", install from https://brew.sh
+```
+
+### 2. Node.js 24 via nvm
+
+```bash
+command -v nvm || echo "nvm missing"
+```
+
+If nvm is missing, install it with the official instructions at
+https://github.com/nvm-sh/nvm#installing-and-updating. Its installer adds
+these lines to `~/.zshrc` (that's the only shell change; open a new terminal
+afterwards):
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+```
+
+Then:
+
+```bash
+nvm install 24          # latest Node 24 LTS; harmless if already installed
+nvm alias default 24    # optional: make it the default in new terminals
+node -v                 # expect v24.x
+```
+
+### 3. Get the code
+
+The GitHub repository has the app one folder down:
+
+```bash
+git clone https://github.com/murirene/markov_midi_graph.git
+cd markov_midi_graph/markov_midi_graph      # the project root (React app)
+```
+
+All later steps say whether to run from the **project root** or from
+**`server/`** (`cd server` from the project root).
+
+### 4. PostgreSQL 18: install and check the cluster
+
+First look at what already exists:
+
+```bash
+brew list --versions postgresql@18                    # installed already?
+ls /opt/homebrew/var/postgresql@18/PG_VERSION         # cluster already initialized?
+lsof -nP -iTCP:5432 -sTCP:LISTEN                      # another PostgreSQL already using port 5432?
+```
+
+- If port 5432 is taken by another PostgreSQL (e.g. Postgres.app), stop that
+  one first, or plan to change the port (see Troubleshooting).
+- Install if needed (this does **not** start it or register a service):
+
+  ```bash
+  brew install postgresql@18
+  ```
+
+  Homebrew's install creates the cluster (data directory)
+  `/opt/homebrew/var/postgresql@18` automatically, **but only if it doesn't
+  already exist**. Existing data is never replaced.
+
+- Only if `PG_VERSION` is **still** missing after the install (for example,
+  the folder was deleted), initialize it yourself. `initdb` refuses to run on
+  a non-empty directory, so it can't overwrite anything:
+
+  ```bash
+  /opt/homebrew/opt/postgresql@18/bin/initdb --locale=en_US.UTF-8 -E UTF-8 -D /opt/homebrew/var/postgresql@18
+  ```
+
+  Either way, the PostgreSQL superuser role is named after your Mac account
+  and has no password.
+
+**Never run `brew services start postgresql@18`**: that would make it start
+at login.
+
+### 5. Local authentication and localhost-only listening
+
+Homebrew's default `pg_hba.conf` trusts every local connection without a
+password. Replace it with the rules this project uses (see
+[Who can log in](#who-can-log-in-and-how-opthomebrewvarpostgresql18pg_hbaconf)).
+The block below skips itself if it was already applied, and keeps Homebrew's
+original as `pg_hba.conf.homebrew-default`. If this cluster existed before
+and you've customized `pg_hba.conf` yourself, review it by hand instead.
+
+```bash
+D=/opt/homebrew/var/postgresql@18
+if grep -q 'markov_midi_graph local dev overrides' "$D/postgresql.conf"; then
+  echo "already configured; nothing changed"
+else
+  cp -n "$D/pg_hba.conf" "$D/pg_hba.conf.homebrew-default"
+  cat > "$D/pg_hba.conf" <<'EOF'
+# Local development cluster for markov_midi_graph (edited from Homebrew default;
+# original saved as pg_hba.conf.homebrew-default).
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# Unix socket: only the matching macOS user (the superuser named after it) gets in.
+local   all             all                                     peer
+
+# TCP from this computer only: password (SCRAM) required. Used by the backend app.
+host    all             all             127.0.0.1/32            scram-sha-256
+host    all             all             ::1/128                 scram-sha-256
+
+local   replication     all                                     peer
+EOF
+  cat >> "$D/postgresql.conf" <<'EOF'
+
+# --- markov_midi_graph local dev overrides ---
+listen_addresses = 'localhost'   # never accept connections from other machines
+port = 5432
+EOF
+  echo "configured"
+fi
+```
+
+### 6. Start PostgreSQL (from `server/`)
+
+```bash
+npm run db:start        # "server started"
+npm run db:status       # "server is running" + "accepting connections"
+```
+
+(If it was already running before step 5, apply the new rules with
+`npm run db:stop && npm run db:start`.)
+
+### 7. Create the restricted app role and the database (from `server/`)
+
+Check first. Empty output means it doesn't exist yet:
+
+```bash
+/opt/homebrew/opt/postgresql@18/bin/psql -d postgres -Atc "select rolname from pg_roles where rolname = 'markov_app'"
+/opt/homebrew/opt/postgresql@18/bin/psql -d postgres -Atc "select datname from pg_database where datname = 'markov_midi_graph_dev'"
+```
+
+Create whichever is missing. If either already exists, PostgreSQL stops
+with `already exists` and changes nothing:
+
+```bash
+/opt/homebrew/opt/postgresql@18/bin/psql -d postgres -v ON_ERROR_STOP=1 \
+  -c "CREATE ROLE markov_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION"
+/opt/homebrew/opt/postgresql@18/bin/psql -d postgres -v ON_ERROR_STOP=1 \
+  -c "CREATE DATABASE markov_midi_graph_dev OWNER markov_app ENCODING 'UTF8'"
+```
+
+These connect as the superuser over the Unix socket (peer authentication, no
+password). The role has no password yet; step 8 sets it.
+
+### 8. Private environment file + app password (from `server/`)
+
+This block creates `server/.env` (mode `600`, git-ignored) from
+`.env.example`, generates a random password, and sets the same password on
+the role. The password is never printed, never typed into your shell
+history, and never passed as a command-line argument (it's sent to `psql` on
+standard input). It refuses to run if `.env` already exists:
+
+```bash
+(
+  set -e
+  umask 077
+  [[ ! -e .env ]] || { echo ".env already exists; not overwriting"; exit 1; }
+  PW="$(openssl rand -hex 24)"
+  { grep -v '^PGPASSWORD=' .env.example; echo "PGPASSWORD=$PW"; } > .env
+  printf "ALTER ROLE markov_app PASSWORD '%s';\n" "$PW" |
+    /opt/homebrew/opt/postgresql@18/bin/psql -d postgres -q -v ON_ERROR_STOP=1
+  echo "created .env and set the markov_app password"
+)
+ls -l .env              # expect -rw-------
+```
+
+If `.env` already exists but you don't know whether its password matches the
+role, test it with `npm run db:psql-app -- -c 'select 1'`. If that fails, reset
+the password (see
+[Lost or need a new password?](#lost-or-need-a-new-password-reset-it-as-superuser)).
+
+### 9. Install dependencies
+
+```bash
+# from server/: backend packages, exactly as pinned in server/package-lock.json
+npm ci
+# from the project root (cd ..): the React app's packages
+npm ci
+```
+
+### 10. Verify (from `server/`)
+
+```bash
+npm run typecheck                                              # no output = OK
+npm run db:psql-app -- -Atc 'select current_user, current_database()'
+#   expect: markov_app|markov_midi_graph_dev
+npm run dev                                                    # terminal 1, leave running
+```
+
+In a second terminal, also from `server/`:
+
+```bash
+npm run status
+#   expect: "server is running", "accepting connections",
+#           "api: running (server pid …, watcher pid …)" and {"status":"ok",…}
+curl -s -X POST http://127.0.0.1:4000/graphql -H 'content-type: application/json' \
+  -d '{"query":"{ health { status database { ok role } } }"}'
+#   expect: {"data":{"health":{"status":"ok","database":{"ok":true,"role":"markov_app"}}}}
+brew services info postgresql@18
+#   expect: Running: false, Loaded: false. brew only tracks services it launched itself,
+#   so a hand-started server shows "false" too: that means no login item was registered
+```
+
+Then shut everything down as described in
+[Shut down when you finish](#shut-down-when-you-finish-reverse-order). Setup
+is complete; from now on use the [Everyday start](#everyday-start-existing-setup).
 
 ---
 
@@ -146,10 +380,28 @@ What these do under the hood (`server/scripts/db.sh`, `server/scripts/api.sh`):
 `-D <data dir>` is what makes these commands target **only this cluster**.
 Other PostgreSQL installs, if any, are never touched.
 
-`npm run api:stop` sends SIGTERM to processes whose command line contains
-`env-file-if-exists=.env src/index.ts`, which only matches this backend. The API
-handles SIGINT/SIGTERM by finishing in-flight requests, closing the DB pool, and
-exiting with code 0.
+**How `api:status` / `api:stop` find the API, and why they can't hit
+another project.** When the server starts listening it writes
+`server/.api.pid`. Line 1 is its own PID. Line 2 is its parent's PID, which is
+the `node --watch` process under `npm run dev`. On a clean exit it deletes the
+file. If the file is missing, the process listening on `PORT` is considered
+instead. Before anything is signaled, each candidate PID must pass **all**
+of these checks:
+
+1. it is still running;
+2. it belongs to your Mac account;
+3. its command is `node … src/index.ts`;
+4. its **working directory is exactly this `server/` folder** (checked with
+   `lsof`).
+
+Check 4 is what protects other projects, even ones running an identical
+command line. A record that fails any check is **stale** (for example, left
+behind by a crash, with the PID since reused by an unrelated program). It's
+deleted with a message saying nothing was signaled. `api:stop` sends SIGTERM
+once (to the watcher under `npm run dev`, which stops its server child), waits
+up to 10 s, and **never force-kills**. If something is still running, it tells
+you and stops. The API handles SIGINT/SIGTERM by finishing in-flight
+requests, closing the DB pool, deleting `.api.pid`, and exiting with code 0.
 
 **Supporting processes:** PostgreSQL runs as several processes (one
 `postgres` main process plus background workers like the checkpointer and WAL
@@ -361,6 +613,7 @@ GUI clients (TablePlus, DBeaver, pgAdmin…) work too: host `localhost`, port
 | `server/.env.example` | yes | Template with placeholder values |
 | `server/.env` | **no** (`server/.gitignore`) | Real values, including the password. Permissions `600` (only you can read it) |
 | `server/.nvmrc` | yes | Node major version for `nvm use` |
+| `server/.api.pid` | **no** (`server/.gitignore`) | Process IDs of the running API; created on start, deleted on clean exit. Safe to delete when the API is stopped |
 | `/opt/homebrew/var/postgresql@18/postgresql.conf` | n/a | PostgreSQL server settings |
 | `/opt/homebrew/var/postgresql@18/pg_hba.conf` | n/a | PostgreSQL login rules |
 
@@ -405,11 +658,12 @@ a random one: `openssl rand -hex 24`.
 
 ### Fresh clone / `.env` missing
 
-```bash
-cd server
-cp .env.example .env && chmod 600 .env
-# edit .env: set PGPASSWORD (reset it as shown above if you don't know it)
-```
+The role's password can't be read back from PostgreSQL, so a new `.env`
+needs a new password. From `server/`, run the block in
+[Fresh-machine setup, step 8](#8-private-environment-file--app-password-from-server).
+It creates `.env` and sets a fresh random password on `markov_app` without
+printing it. Any older copy of `.env` (e.g. in another clone) stops working
+until you copy the new `PGPASSWORD` line into it.
 
 ---
 
@@ -421,13 +675,15 @@ server/
 ├── package.json            scripts + dependencies (separate from the React app)
 ├── tsconfig.json           type-check settings for Node's TS type stripping
 ├── .env.example / .env     config template / real config (git-ignored)
+├── .api.pid                exists only while the API runs: its process IDs (git-ignored)
 ├── .nvmrc                  "24"
 ├── scripts/
 │   ├── db.sh               start | stop | status | psql | psql-app
-│   └── api.sh              status | stop
+│   └── api.sh              status | stop (verifies process identity before signaling)
 └── src/
     ├── index.ts            builds the Express app, mounts REST + Apollo, listens, graceful shutdown
     ├── config.ts           reads + validates env vars
+    ├── pidFile.ts          writes/removes server/.api.pid
     ├── routes/
     │   └── health.ts       REST: GET /api/health
     ├── graphql/
@@ -490,7 +746,10 @@ PostgreSQL log: `could not bind … Address already in use`.
 lsof -nP -iTCP:4000 -sTCP:LISTEN     # or :5432. Shows the command + PID holding it
 ```
 
-- If it's an old copy of this API: `npm run api:stop`.
+- For 4000, run `npm run api:status` first. It says either
+  `api: running (server pid …)` (an old copy of **this** API; stop it with
+  `npm run api:stop`) or `port 4000 is in use by another program (pid …, not
+  this backend)`. `api:stop` deliberately won't touch that other program.
 - If it's something else you need, change `PORT=` in `server/.env` instead.
 - For 5432, another PostgreSQL may be running (e.g. Postgres.app). Stop that one
   in its own way, or change `port` at the bottom of `postgresql.conf` **and**
@@ -532,7 +791,8 @@ you ran the command from `server/` (the `.env` path is relative to it).
 ## After a reboot / confirming nothing starts automatically
 
 After a reboot (or logout) **nothing from this setup is running**. PostgreSQL
-and the API stay off until you run the Quick start. Your data persists on disk
+and the API stay off until you run the
+[Everyday start](#everyday-start-existing-setup). Your data persists on disk
 in `/opt/homebrew/var/postgresql@18`.
 
 To confirm autostart is disabled:
