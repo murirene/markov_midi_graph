@@ -9,6 +9,7 @@ import { resolvers } from "./graphql/resolvers.ts"
 import { typeDefs } from "./graphql/schema.ts"
 import { removePidFile, writePidFile } from "./pidFile.ts"
 import { healthRouter } from "./routes/health.ts"
+import { graphRouter } from "./routes/graph.ts"
 
 // One Express app serves both REST (/api/...) and GraphQL (/graphql).
 const app = express()
@@ -26,6 +27,7 @@ await apollo.start()
 
 app.use(express.json())
 app.use("/api", healthRouter)
+app.use("/api", graphRouter)
 app.use("/graphql", expressMiddleware(apollo))
 
 httpServer.listen(config.port, config.host, () => {
