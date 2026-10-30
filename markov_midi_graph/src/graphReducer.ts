@@ -5,7 +5,9 @@ export type MidiState = {
   midiGraph: Graph<string>
 }
 
-export type MidiAction = { type: "add node"; coordinate: Coordinate }
+export type MidiAction =
+  | { type: "add node"; coordinate: Coordinate }
+  | { type: "load graph"; graph: Graph<string> }
 
 export default function graphReducer(
   state: MidiState,
@@ -15,6 +17,9 @@ export default function graphReducer(
     case "add node": {
       const newGraph = state.midiGraph.clone()
       return { midiGraph: newGraph.addNode("", { ...action.coordinate }) }
+    }
+    case "load graph": {
+      return { midiGraph: action.graph }
     }
 
     default:

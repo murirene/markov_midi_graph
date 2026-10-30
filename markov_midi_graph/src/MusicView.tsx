@@ -27,6 +27,23 @@ export function MusicView() {
     return { midiGraph: g }
   })
 
+  useEffect(() => {
+    fetch("/api/graph/")
+      .then((response) => response.json())
+      .then((data) => {
+         const g = new Graph<string>()
+         data.nodes.forEach( node => {
+            g.addNode(node.nodeId, node.value, {x: node.x, y: node.y})
+         })
+
+         data.edges.forEach( edge => {
+            g.getNode(edge.fromNodeId)?.addNeighbor(edge.toNodeId, edge.weight)
+         })
+
+         dispatch({type: 'load graph', graph: g})
+      })
+  }, [])
+
   // add and dislodge resize listeners for window changes
   useEffect(() => {
     const handleViewResize = () => {

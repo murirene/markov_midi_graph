@@ -43,8 +43,7 @@ export default class Graph<T> {
     )
   }
 
-  addNode(value: T, coordinate = { x: 0, y: 0 }): this {
-    const nodeId = this.nodeIdSeq++
+  addNode(nodeId: number, value: T, coordinate = { x: 0, y: 0 }): this {
     this.nodes.set(nodeId, new Node(nodeId, value, coordinate))
 
     return this
